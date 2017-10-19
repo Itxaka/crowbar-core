@@ -950,6 +950,10 @@ class ServiceObject
       "skip_unready_nodes", {}
     ).fetch("enabled", false)
 
+    skip_unchanged_nodes_enabled = Rails.application.config.experimental.fetch(
+      "skip_unchanged_nodes", {}
+    ).fetch("enabled", false)
+
     # Part I: Looking up data & checks
     #
     # we look up the role in the database (if there is one), the new one is
@@ -1043,6 +1047,17 @@ class ServiceObject
         update_proposal_status(inst, "failed", msg)
         return [405, msg]
       end
+    end
+
+    if skip_unchanged_nodes_enabled
+      cleaned_elements = {}
+      new_elements.each do |r|
+        cleaned_elements[r] ||= {}
+        new_elements[r].each do |node_name|
+          cleaned_elements[r] << node_name unless skip_unchanged_node?(node_name, old_role, role)
+        end
+      end
+      new_elements = cleaned_elements
     end
 
     # use the same order as in the old deployment if the element order is not filled yet
@@ -1447,6 +1462,11 @@ class ServiceObject
   def proposal_dependencies(role)
     # Default none
     []
+  end
+
+  def skip_unchanged_node?(node_name, old_role, role)
+    # By default dont skip anything
+    false
   end
 
   def expand_items_in_elements(elements)
